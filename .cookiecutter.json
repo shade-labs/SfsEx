@@ -1,0 +1,16 @@
+{
+  "_checkout": "2022.6.3",
+  "_output_dir": "/Users/matias/Code/shade",
+  "_repo_dir": "/Users/matias/.cookiecutters/cookiecutter-hypermodern-python",
+  "_template": "gh:cjolowicz/cookiecutter-hypermodern-python",
+  "author": "Matias Kotlik",
+  "copyright_year": "2024",
+  "development_status": "Development Status :: 1 - Planning",
+  "email": "matias@shade.inc",
+  "friendly_name": "SEx",
+  "github_user": "shade-labs",
+  "license": "MIT",
+  "package_name": "SEx",
+  "project_name": "SEx",
+  "version": "0.0.0"
+}
