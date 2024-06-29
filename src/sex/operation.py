@@ -17,6 +17,10 @@ class Operation(abc.ABC):
         """
         Randomly generate a new operation that is valid for the given state.
 
+        This method should return None if no valid operation can be generated for the given state.
+
+        This method should not modify the state of the system.
+
         The standard library `random` module should be used to generate random values.
         It will be seeded with a fixed value by the caller, so the operation should be deterministic for a given state.
 
@@ -33,6 +37,19 @@ class Operation(abc.ABC):
         unexpected state.
 
         :param fs: The path to the root of the filesystem to operate on.
+        :return: None
+        """
+        pass
+
+    @abc.abstractmethod
+    def update(self, state: State) -> None:
+        """
+        Update the state of the virtual filesystem to reflect the changes made by the operation.
+
+        This method should raise an exception if the operation fails or if the filesystem was found to be in an
+        unexpected state.
+
+        :param state: The current state of the system.
         :return: None
         """
         pass
@@ -55,7 +72,21 @@ class Operation(abc.ABC):
         """
         pass
 
+    @classmethod
+    @property
+    @abc.abstractmethod
+    def name(cls) -> str:
+        pass
+
     @abc.abstractmethod
     def __str__(self) -> str:
         """:return: human-readable string representation of the operation."""
         pass
+
+
+class VerificationError(Exception):
+    """
+    Verification error.
+
+    The state of the system is not as expected.
+    """

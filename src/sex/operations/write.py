@@ -1,4 +1,4 @@
-"""Read operation."""
+"""Write operation."""
 
 import random
 from pathlib import Path
@@ -10,8 +10,8 @@ from sex.operation import VerificationError
 from sex.state import State
 
 
-class Read(Operation):
-    """Read operation."""
+class Write(Operation):
+    """Write operation."""
 
     @classmethod
     @property
@@ -26,42 +26,48 @@ class Read(Operation):
             return None
         offset = random.randint(0, len(file.data))
         length = random.randint(0, len(file.data) - offset)
-        return cls(path, offset, length, file.data[offset : offset + length])
+        data = bytes(random.getrandbits(8) for _ in range(length))
+        return cls(path, offset, length, data)
 
-    def __init__(self, path: Path, offset: int, length: int, expected: bytes) -> None:
+    def __init__(self, path: Path, offset: int, length: int, data: bytes) -> None:
         """
-        Initialize a new read operation.
+        Initialize a new write operation.
 
-        :param path: The path to the file to read.
-        :param offset: The offset in the file to start reading from.
-        :param length: The number of bytes to read.
-        :param expected: The expected bytes that should be read.
+        :param path: The path to the file to write.
+        :param offset: The offset in the file to start writeing from.
+        :param length: The number of bytes to write.
+        :param expected: The expected bytes that should be write.
         """
         self.path = path
         self.offset = offset
         self.length = length
-        self.expected = expected
+        self.data = data
 
     def execute(self, fs: Path) -> None:
+        path = fs / self.path
+        with path.open("r+b") as f:
+            f.seek(self.offset)
+            f.write(self.data)
+
+    def update(self, state: State) -> None:
+        state.resolve_file(self.path).data[
+            self.offset : self.offset + self.length
+        ] = self.data
+
+    def verify(self, fs: Path) -> None:
         path = fs / self.path
         with path.open("rb") as f:
             f.seek(self.offset)
             data = f.read(self.length)
-        if data != self.expected:
+        if data != self.data:
             raise VerificationError(
-                f"Read data {data!r} does not match expected {self.expected!r}"
+                f"Data in file {data!r} does not match expected {self.data!r}"
             )
-
-    def update(self, state: State) -> None:
-        pass  # there is no change to the state
-
-    def verify(self, fs: Path) -> None:
-        pass  # there is no change to verify
 
     def __str__(self) -> str:
         end = self.offset + self.length
         return (
-            f"READ {self.path} "
+            f"WRITE {self.path} "
             f"from 0x{self.offset:04x} ({self.offset}) "
             f"thru 0x{end:04x} ({end}) "
             f"or 0x{self.length:04x} ({self.length}) bytes"
