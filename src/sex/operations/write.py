@@ -16,7 +16,7 @@ class Write(Operation):
     @classmethod
     @property
     def name(cls) -> str:
-        return "READ"
+        return "WRITE"
 
     @classmethod
     def build(cls, state: State) -> Optional[Self]:
@@ -61,7 +61,7 @@ class Write(Operation):
             data = f.read(self.length)
         if data != self.data:
             raise VerificationError(
-                f"Data in file {data!r} does not match expected {self.data!r}"
+                f"Data in file {path} does not match what was expected."
             )
 
     def __str__(self) -> str:

@@ -3,9 +3,11 @@
 import random
 import time
 from pathlib import Path
+from typing import Optional
 
 import click
 
+from sex.operation import Operation
 from sex.operations.create import Create
 from sex.operations.delete import Delete
 from sex.operations.read import Read
@@ -22,6 +24,15 @@ operations = [Read, Write, Create, Delete, Truncate]
 @click.option("-v", "--verbose", is_flag=True, help="Debug output for all operations.")
 @click.option("-s", "--seed", type=int, help="Seed for the random number generator.")
 @click.option(
+    "-i",
+    "--interactive",
+    type=int,
+    help="Enter interactive mode after running N operations.",
+)
+@click.option(
+    "-p", "--progress", is_flag=True, help="Show timeout progress while verifying."
+)
+@click.option(
     "-n",
     "--num-operations",
     type=int,
@@ -29,7 +40,7 @@ operations = [Read, Write, Create, Delete, Truncate]
     default=-1,
 )
 @click.option(
-    "-t", "--timeout", type=float, help="Verification timeout in seconds.", default=5
+    "-t", "--timeout", type=float, help="Verification timeout in seconds.", default=90
 )
 @click.argument(
     "mountpoints",
@@ -41,10 +52,12 @@ operations = [Read, Write, Create, Delete, Truncate]
 )
 def main(
     verbose: bool,
-    seed: int,
-    num_operations: int,
+    seed: Optional[int],
+    interactive: Optional[int],
+    progress: bool,
+    num_operations: Optional[int],
     timeout: float,
-    mountpoints: list[str],
+    mountpoints: list[Path],
 ) -> None:
     """SEx."""
     state = State()
@@ -62,8 +75,6 @@ def main(
         operation = op_cls.build(state)
         if operation is None:
             # skip operation
-            if verbose:
-                click.echo(f"Skip {op_cls.name}")
             continue
 
         # pick a mountpoint for the operation
@@ -72,24 +83,52 @@ def main(
         if verbose:
             click.echo(f"{n}: {operation} on {main_mountpoint}")
 
+        if interactive is not None and interactive <= n:
+            print("Press Enter to execute the operation...", end="")
+            input()
+
         # apply it
         operation.execute(main_mountpoint)
         operation.update(state)
 
-        # verify on all mountpoints
-        start = time.perf_counter()
-        for other_mountpoint in mountpoints:
-            while True:
-                try:
-                    operation.verify(other_mountpoint)
-                except Exception as e:
-                    if time.perf_counter() - start > timeout:
-                        raise e from None
-                    time.sleep(0.1)
-                else:
-                    break
+        # verify it
+        verify_operation(mountpoints, operation, timeout, progress)
 
         n += 1
+
+
+def verify_operation(
+    mountpoints: list[Path], operation: Operation, timeout: float, show_progress: bool
+) -> None:
+    """
+    Verify that an operation was successfully applied to all mountpoints.
+
+    :param mountpoints: The list of mountpoints to verify the operation on.
+    :param operation: The operation to verify.
+    :param timeout: The **total** timeout in seconds for verification across **all** mountpoints.
+    :param show_progress: If true, print remaining timeout to stdout while verifying.
+    """
+    start = time.perf_counter()
+    for other_mountpoint in mountpoints:
+        while True:
+            try:
+                operation.verify(other_mountpoint)
+            except Exception as e:
+                remaining = timeout - (time.perf_counter() - start)
+                if remaining <= 0:
+                    raise e from None
+
+                if show_progress:
+                    print(
+                        f"Verifying {operation.name} on {other_mountpoint}... ({remaining:.2f}s)",
+                        end="\r",
+                    )
+                time.sleep(0.1)
+            else:
+                break
+            finally:
+                if show_progress:
+                    print(end="\r")
 
 
 if __name__ == "__main__":
