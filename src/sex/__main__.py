@@ -60,6 +60,17 @@ def main(
     mountpoints: list[Path],
 ) -> None:
     """SEx."""
+    # ensure mountpoints are empty
+    for mountpoint in mountpoints:
+        existing_paths = list(
+            path for path in mountpoint.iterdir() if not path.name.startswith(".")
+        )
+        if existing_paths:
+            raise click.ClickException(
+                f"Mountpoint {mountpoint} is not empty: {", ".join(str(p) for p in existing_paths)} exist.\n"
+                "Use -r to remove all files before running."
+            )
+
     state = State()
 
     if seed is None:
@@ -108,6 +119,11 @@ def verify_operation(
     :param timeout: The **total** timeout in seconds for verification across **all** mountpoints.
     :param show_progress: If true, print remaining timeout to stdout while verifying.
     """
+
+    def print_progress(msg: str = ""):
+        if show_progress:
+            print(msg.ljust(80), end="\r")
+
     start = time.perf_counter()
     for other_mountpoint in mountpoints:
         while True:
@@ -118,17 +134,14 @@ def verify_operation(
                 if remaining <= 0:
                     raise e from None
 
-                if show_progress:
-                    print(
-                        f"Verifying {operation.name} on {other_mountpoint}... ({remaining:.2f}s)",
-                        end="\r",
-                    )
+                print_progress(
+                    f"Verifying {operation.name} on {other_mountpoint}... ({remaining:.2f}s)",
+                )
                 time.sleep(0.1)
             else:
                 break
             finally:
-                if show_progress:
-                    print(end="\r")
+                print_progress()
 
 
 if __name__ == "__main__":
