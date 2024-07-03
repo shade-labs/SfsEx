@@ -40,7 +40,7 @@ operations = [Read, Write, Create, Delete, Truncate]
     default=-1,
 )
 @click.option(
-    "-t", "--timeout", type=float, help="Verification timeout in seconds.", default=90
+    "-t", "--timeout", type=float, help="Verification timeout in seconds.", default=10
 )
 @click.argument(
     "mountpoints",
