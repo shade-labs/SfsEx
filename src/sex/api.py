@@ -93,7 +93,7 @@ class Api:
         res.raise_for_status()
 
     def delete(self, path: Path) -> None:
-        res = requests.post(
+        res = requests.delete(
             self.url + "/admin/fs/delete",
             timeout=5,
             params={"path": str(path), "drive": self.drive, "email": "sex@shade.inc"},

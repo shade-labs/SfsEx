@@ -68,6 +68,14 @@ class Write(Operation):
                 f"Data in file {path} does not match what was expected."
             )
 
+    def verify_api(self, api: Api) -> None:
+        data = api.download(self.path)
+        data = data[self.offset : self.offset + self.length]
+        if data != self.data:
+            raise VerificationError(
+                f"Read data {data!r} does not match expected {self.expected!r}"
+            )
+
     def __str__(self) -> str:
         end = self.offset + self.length
         return (
