@@ -38,7 +38,7 @@ safety = ">=1.10.3"
 typeguard = ">=2.13.3"
 
 [tool.poetry.scripts]
-SEx = "sex.__main__:main"
+SEx = "sex.exerciser:exercise"
 
 [tool.isort]
 profile = "black"

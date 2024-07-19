@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 from typing import Self
 
+from sex.api import Api
 from sex.operation import Operation
 from sex.operation import VerificationError
 from sex.state import State
@@ -43,19 +44,22 @@ class Write(Operation):
         self.length = length
         self.data = data
 
-    def execute(self, fs: Path) -> None:
-        path = fs / self.path
+    def execute_mount(self, root: Path) -> None:
+        path = root / self.path.relative_to(root.anchor)
         with path.open("r+b") as f:
             f.seek(self.offset)
             f.write(self.data)
+
+    def is_executable_for_client(self, client: Path | Api) -> bool:
+        return isinstance(client, Path)
 
     def update(self, state: State) -> None:
         state.resolve_file(self.path).data[
             self.offset : self.offset + self.length
         ] = self.data
 
-    def verify(self, fs: Path) -> None:
-        path = fs / self.path
+    def verify_mount(self, root: Path) -> None:
+        path = root / self.path.relative_to(root.anchor)
         with path.open("rb") as f:
             f.seek(self.offset)
             data = f.read(self.length)

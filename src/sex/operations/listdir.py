@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 from typing import Self
 
+from sex.api import Api
 from sex.operation import Operation
 from sex.operation import VerificationError
 from sex.state import State
@@ -36,9 +37,19 @@ class Listdir(Operation):
         self.path = path
         self.expected = expected
 
-    def execute(self, fs: Path) -> None:
-        path = fs / self.path
-        names = {child.name for child in path.iterdir()}
+    def execute_mount(self, root: Path) -> None:
+        path = root / self.path.relative_to(root.anchor)
+        names = {
+            child.name for child in path.iterdir() if not child.name.startswith(".")
+        }
+        if names != self.expected:
+            raise VerificationError(
+                f"Listed names {names!r} do not match expected {self.expected!r}"
+            )
+
+    def execute_api(self, api: Api) -> None:
+        names = {Path(obj["path"]).name for obj in api.listdir(self.path)}
+        names = {name for name in names if not name.startswith(".")}
         if names != self.expected:
             raise VerificationError(
                 f"Listed names {names!r} do not match expected {self.expected!r}"
@@ -47,7 +58,10 @@ class Listdir(Operation):
     def update(self, state: State) -> None:
         pass  # there is no change to the state
 
-    def verify(self, fs: Path) -> None:
+    def verify_mount(self, root: Path) -> None:
+        pass  # there is no change to verify
+
+    def verify_api(self, api: Api) -> None:
         pass  # there is no change to verify
 
     def __str__(self) -> str:

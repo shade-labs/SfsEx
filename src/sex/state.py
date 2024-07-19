@@ -40,7 +40,7 @@ class State:
 
     def _iter_nodes(self) -> Iterator[Tuple[Path, Node]]:
         """Iterate over all nodes in the filesystem."""
-        q = [(Path(), self.root)]
+        q = [(Path("/"), self.root)]
         while q:
             path, node = q.pop()
             yield path, node
@@ -55,7 +55,7 @@ class State:
         ]
 
     def directories(self) -> list[Tuple[Path, Directory]]:
-        """Iterate over all directorys in the filesystem."""
+        """Iterate over all directories in the filesystem."""
         return [
             (path, node)
             for path, node in self._iter_nodes()
@@ -65,7 +65,7 @@ class State:
     def _resolve(self, path: Path) -> Node:
         """Resolve a path to a node in the filesystem."""
         node = self.root
-        for name in path.parts:
+        for name in path.parts[1:]:
             if isinstance(node, File):
                 raise StateError(f"Path {path} does not exist")
             if name not in node.children:
