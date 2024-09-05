@@ -6,6 +6,8 @@ from typing import Optional
 from typing import Self
 
 from sex.api import Api
+from sex.constants import ACTUAL_DATA_FILENAME
+from sex.constants import EXPECTED_DATA_FILENAME
 from sex.operation import Operation
 from sex.operation import VerificationError
 from sex.state import State
@@ -64,16 +66,20 @@ class Write(Operation):
             f.seek(self.offset)
             data = f.read(self.length)
         if data != self.data:
+            Path(ACTUAL_DATA_FILENAME).write_bytes(data)
+            Path(EXPECTED_DATA_FILENAME).write_bytes(self.data)
             raise VerificationError(
-                f"Data in file {path} does not match what was expected."
+                f"Read data (at {ACTUAL_DATA_FILENAME}) does not match expected (at {EXPECTED_DATA_FILENAME})"
             )
 
     def verify_api(self, api: Api) -> None:
         data = api.download(self.path)
         data = data[self.offset : self.offset + self.length]
         if data != self.data:
+            Path(ACTUAL_DATA_FILENAME).write_bytes(data)
+            Path(EXPECTED_DATA_FILENAME).write_bytes(self.data)
             raise VerificationError(
-                f"Read data {data!r} does not match expected {self.expected!r}"
+                f"Read data (at {ACTUAL_DATA_FILENAME}) does not match expected (at {EXPECTED_DATA_FILENAME})"
             )
 
     def __str__(self) -> str:
