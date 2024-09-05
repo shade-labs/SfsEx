@@ -30,21 +30,22 @@ class Write(Operation):
         offset = random.randint(0, len(file.data))
         length = random.randint(0, len(file.data) - offset)
         data = bytes(random.getrandbits(8) for _ in range(length))
-        return cls(path, offset, length, data)
+        expected = file.data[:offset] + data + file.data[offset + length :]
+        return cls(path, offset, data, expected)
 
-    def __init__(self, path: Path, offset: int, length: int, data: bytes) -> None:
+    def __init__(self, path: Path, offset: int, data: bytes, expected: bytes) -> None:
         """
         Initialize a new write operation.
 
         :param path: The path to the file to write.
-        :param offset: The offset in the file to start writeing from.
-        :param length: The number of bytes to write.
-        :param expected: The expected bytes that should be write.
+        :param offset: The offset in the file to start writing from.
+        :param data: The bytes to write.
         """
+        # TODO pull the length from data
         self.path = path
         self.offset = offset
-        self.length = length
         self.data = data
+        self.expected = expected
 
     def execute_mount(self, root: Path) -> None:
         path = root / self.path.relative_to(root.anchor)
@@ -57,15 +58,14 @@ class Write(Operation):
 
     def update(self, state: State) -> None:
         state.resolve_file(self.path).data[
-            self.offset : self.offset + self.length
+            self.offset : self.offset + len(self.data)
         ] = self.data
 
     def verify_mount(self, root: Path) -> None:
         path = root / self.path.relative_to(root.anchor)
         with path.open("rb") as f:
-            f.seek(self.offset)
-            data = f.read(self.length)
-        if data != self.data:
+            data = f.read()
+        if data != self.expected:
             Path(ACTUAL_DATA_FILENAME).write_bytes(data)
             Path(EXPECTED_DATA_FILENAME).write_bytes(self.data)
             raise VerificationError(
@@ -74,7 +74,7 @@ class Write(Operation):
 
     def verify_api(self, api: Api) -> None:
         data = api.download(self.path)
-        data = data[self.offset : self.offset + self.length]
+        data = data[self.offset : self.offset + len(self.data)]
         if data != self.data:
             Path(ACTUAL_DATA_FILENAME).write_bytes(data)
             Path(EXPECTED_DATA_FILENAME).write_bytes(self.data)
@@ -83,10 +83,11 @@ class Write(Operation):
             )
 
     def __str__(self) -> str:
-        end = self.offset + self.length
+        length = len(self.data)
+        end = self.offset + length
         return (
             f"WRITE {self.path} "
             f"from 0x{self.offset:04x} ({self.offset}) "
             f"thru 0x{end:04x} ({end}) "
-            f"or 0x{self.length:04x} ({self.length}) bytes"
+            f"or 0x{length:04x} ({length}) bytes"
         )
