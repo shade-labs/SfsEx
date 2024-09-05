@@ -27,14 +27,20 @@ operations = [Read, Write, Create, Delete, Truncate, Listdir]
 @click.option("-v", "--verbose", is_flag=True, help="Debug output for all operations.")
 @click.option("-s", "--seed", type=int, help="Seed for the random number generator.")
 @click.option(
+    "-p",
+    "--position",
+    type=click.Path(
+        exists=True, file_okay=True, dir_okay=False, resolve_path=True, path_type=Path
+    ),
+    help="Path to a position file to run.",
+)
+@click.option(
     "-i",
     "--interactive",
     type=int,
     help="Enter interactive mode after running N operations.",
 )
-@click.option(
-    "-p", "--progress", is_flag=True, help="Show timeout progress while verifying."
-)
+@click.option("--progress", is_flag=True, help="Show timeout progress while verifying.")
 @click.option(
     "-n",
     "--num-operations",
@@ -63,6 +69,7 @@ operations = [Read, Write, Create, Delete, Truncate, Listdir]
 )
 def exercise(
     verbose: bool,
+    position: Optional[Path],
     seed: Optional[int],
     interactive: Optional[int],
     progress: bool,
@@ -98,13 +105,84 @@ def exercise(
                 f"API {api_url.url} is not empty: {", ".join(str(p) for p in existing_paths)} exist.\n"
             )
 
+    if position:
+        click.echo(f"Using position file: {position}")
+        exercise_position(
+            verbose, position, timeout, mountpoints, apis, interactive, progress
+        )
+    else:
+        if seed is None:
+            seed = random.randint(0, 2**8)
+
+        click.echo(f"Using seed: {seed}")
+        random.seed(seed)
+
+        exercise_random(
+            verbose,
+            num_operations,
+            timeout,
+            mountpoints,
+            apis,
+            interactive,
+            progress,
+        )
+
+
+def exercise_position(
+    verbose: bool,
+    position_file: Path,
+    timeout: float,
+    mountpoints: list[Path],
+    apis: list[Api],
+    interactive: Optional[int],
+    progress: bool,
+) -> None:
+    """
+    Run the exerciser using a position file.
+
+    :param position_file: Path to position file describing the operations to run.
+    """
     state = State()
 
-    if seed is None:
-        seed = random.randint(0, 2**8)
+    for n, step in enumerate(eval(position_file.read_text())):  # noqa: S307
+        mountpoint_idx, operation = step
+        try:
+            mountpoint = mountpoints[mountpoint_idx]
+        except IndexError:
+            raise click.ClickException(
+                f"Invalid mountpoint index: {mountpoint_idx} in position file {position_file}"
+            ) from None
 
-    click.echo(f"Using seed: {seed}")
-    random.seed(seed)
+        if verbose:
+            click.echo(f"{n}: {operation} on {mountpoint}")
+
+        if interactive is not None and interactive <= n:
+            print("Press Enter to execute the operation...", end="")
+            input()
+
+        # apply it
+        operation.execute(mountpoint)
+        operation.update(state)
+
+        # verify it
+        verify_operation(mountpoints + apis, operation, timeout, progress)
+
+
+def exercise_random(
+    verbose: bool,
+    num_operations: int,
+    timeout: float,
+    mountpoints: list[Path],
+    apis: list[Api],
+    interactive: Optional[int],
+    progress: bool,
+) -> None:
+    """
+    Run the exerciser with random operations.
+
+    :param num_operations: The number of operations to generate.
+    """
+    state = State()
 
     n = 0
     while num_operations == -1 or n < num_operations:
@@ -124,7 +202,7 @@ def exercise(
             click.echo(f"{n}: {operation} on {main_client}")
 
         if interactive is not None and interactive <= n:
-            click.echo("Press Enter to execute the operation...", end="")
+            print("Press Enter to execute the operation...", end="")
             input()
 
         # apply it
