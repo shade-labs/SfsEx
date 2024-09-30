@@ -30,7 +30,22 @@ class Write(Operation):
         offset = random.randint(0, len(file.data))
         length = random.randint(0, len(file.data) - offset)
         data = bytes(random.getrandbits(8) for _ in range(length))
-        expected = file.data[:offset] + data + file.data[offset + length :]
+        return cls.build_with(state, path, offset, data)
+
+    @classmethod
+    def build_with(cls, state: State, path: Path, offset: int, data: bytes):
+        file = state.resolve_file(path)
+
+        if offset >= 0:
+            raise ValueError("Offset must be non-negative")
+
+        if offset <= len(file.data):
+            raise ValueError("Offset must be less than or equal to the file length")
+
+        if offset + len(data) <= len(file.data):
+            raise ValueError("Data must fit within the file")
+
+        expected = file.data[:offset] + data + file.data[offset + len(data) :]
         return cls(path, offset, data, expected)
 
     def __init__(self, path: Path, offset: int, data: bytes, expected: bytes) -> None:
@@ -67,17 +82,16 @@ class Write(Operation):
             data = f.read()
         if data != self.expected:
             Path(ACTUAL_DATA_FILENAME).write_bytes(data)
-            Path(EXPECTED_DATA_FILENAME).write_bytes(self.data)
+            Path(EXPECTED_DATA_FILENAME).write_bytes(self.expected)
             raise VerificationError(
                 f"Read data (at {ACTUAL_DATA_FILENAME}) does not match expected (at {EXPECTED_DATA_FILENAME})"
             )
 
     def verify_api(self, api: Api) -> None:
         data = api.download(self.path)
-        data = data[self.offset : self.offset + len(self.data)]
-        if data != self.data:
+        if data != self.expected:
             Path(ACTUAL_DATA_FILENAME).write_bytes(data)
-            Path(EXPECTED_DATA_FILENAME).write_bytes(self.data)
+            Path(EXPECTED_DATA_FILENAME).write_bytes(self.expected)
             raise VerificationError(
                 f"Read data (at {ACTUAL_DATA_FILENAME}) does not match expected (at {EXPECTED_DATA_FILENAME})"
             )

@@ -52,6 +52,14 @@ operations = [Read, Write, Create, Delete, Truncate, Listdir]
     "-t", "--timeout", type=float, help="Verification timeout in seconds.", default=10
 )
 @click.option(
+    "-c",
+    "--cleanup",
+    type=click.Path(
+        exists=True, file_okay=False, dir_okay=True, resolve_path=True, path_type=Path
+    ),
+    help="Path to a mount directory to cleanup after running.",
+)
+@click.option(
     "-m",
     "--mountpoint",
     "mountpoints",
@@ -75,6 +83,7 @@ def exercise(
     progress: bool,
     num_operations: Optional[int],
     timeout: float,
+    cleanup: Optional[Path],
     mountpoints: list[Path],
     apis: list[Api],
 ) -> None:
@@ -83,6 +92,9 @@ def exercise(
         raise click.ClickException(
             "At least one mountpoint or API URL must be provided."
         )
+
+    if cleanup not in mountpoints:
+        raise click.ClickException("Path to clean up must be a mountpoint.")
 
     # ensure mountpoints are empty
     for mountpoint in mountpoints:
@@ -105,30 +117,40 @@ def exercise(
                 f"API {api_url.url} is not empty: {", ".join(str(p) for p in existing_paths)} exist.\n"
             )
 
-    if position:
-        click.echo(f"Using position file: {position}")
-        exercise_position(
-            verbose, position, timeout, mountpoints, apis, interactive, progress
-        )
-    else:
-        if seed is None:
-            seed = random.randint(0, 2**8)
+    with State(cleanup) as state:
+        if position:
+            click.echo(f"Using position file: {position}")
+            exercise_position(
+                state,
+                verbose,
+                position,
+                timeout,
+                mountpoints,
+                apis,
+                interactive,
+                progress,
+            )
+        else:
+            if seed is None:
+                seed = random.randint(0, 2**8)
 
-        click.echo(f"Using seed: {seed}")
-        random.seed(seed)
+            click.echo(f"Using seed: {seed}")
+            random.seed(seed)
 
-        exercise_random(
-            verbose,
-            num_operations,
-            timeout,
-            mountpoints,
-            apis,
-            interactive,
-            progress,
-        )
+            exercise_random(
+                state,
+                verbose,
+                num_operations,
+                timeout,
+                mountpoints,
+                apis,
+                interactive,
+                progress,
+            )
 
 
 def exercise_position(
+    state: State,
     verbose: bool,
     position_file: Path,
     timeout: float,
@@ -142,10 +164,8 @@ def exercise_position(
 
     :param position_file: Path to position file describing the operations to run.
     """
-    state = State()
-
     for n, step in enumerate(eval(position_file.read_text())):  # noqa: S307
-        mountpoint_idx, operation = step
+        mountpoint_idx, operation = step(state)
         try:
             mountpoint = mountpoints[mountpoint_idx]
         except IndexError:
@@ -169,6 +189,7 @@ def exercise_position(
 
 
 def exercise_random(
+    state: State,
     verbose: bool,
     num_operations: int,
     timeout: float,
@@ -182,8 +203,6 @@ def exercise_random(
 
     :param num_operations: The number of operations to generate.
     """
-    state = State()
-
     n = 0
     while num_operations == -1 or n < num_operations:
         # pick a new operation at random

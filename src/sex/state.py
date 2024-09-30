@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
 from typing import Iterator
+from typing import Optional
 from typing import Tuple
 
 
@@ -34,9 +35,32 @@ class Directory(Node):
 class State:
     """Representation of the filesystem state."""
 
-    def __init__(self) -> None:
+    root: Directory
+    cleanup_mount_path: Optional[Path]
+
+    def __init__(self, cleanup_mount_path: Optional[Path]) -> None:
         """Initialize an empty virtual filesystem."""
         self.root = Directory()
+        self.cleanup_mount_path = cleanup_mount_path
+
+    def __enter__(self):
+        """Enter the filesystem state context."""
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Exit the filesystem state context."""
+        if not self.cleanup_mount_path:
+            return
+
+        for path, _ in self.files():
+            (self.cleanup_mount_path / path.relative_to("/")).unlink()
+
+        for path, _ in self.directories():
+            # don't try to remove the mountpoint
+            if path == Path("/"):
+                continue
+
+            (self.cleanup_mount_path / path.relative_to("/")).rmdir()
 
     def _iter_nodes(self) -> Iterator[Tuple[Path, Node]]:
         """Iterate over all nodes in the filesystem."""
