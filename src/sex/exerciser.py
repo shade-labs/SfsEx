@@ -93,7 +93,7 @@ def exercise(
             "At least one mountpoint or API URL must be provided."
         )
 
-    if cleanup not in mountpoints:
+    if cleanup and cleanup not in mountpoints:
         raise click.ClickException("Path to clean up must be a mountpoint.")
 
     # ensure mountpoints are empty
