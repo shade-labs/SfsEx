@@ -36,13 +36,11 @@ class Write(Operation):
     def build_with(cls, state: State, path: Path, offset: int, data: bytes):
         file = state.resolve_file(path)
 
-        if offset >= 0:
-            raise ValueError("Offset must be non-negative")
+        start = offset
+        end = offset + len(data)
+        is_valid = 0 < start and end <= len(file.data)
 
-        if offset <= len(file.data):
-            raise ValueError("Offset must be less than or equal to the file length")
-
-        if offset + len(data) <= len(file.data):
+        if not is_valid:
             raise ValueError("Data must fit within the file")
 
         expected = file.data[:offset] + data + file.data[offset + len(data) :]
