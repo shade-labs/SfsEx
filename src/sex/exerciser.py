@@ -49,7 +49,7 @@ operations = [Read, Write, Create, Delete, Truncate, Listdir]
     default=-1,
 )
 @click.option(
-    "-t", "--timeout", type=float, help="Verification timeout in seconds.", default=10
+    "-t", "--timeout", type=float, help="Verification timeout in seconds.", default=20
 )
 @click.option(
     "-c",
