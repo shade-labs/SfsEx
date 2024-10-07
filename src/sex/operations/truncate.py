@@ -52,6 +52,10 @@ class Truncate(Operation):
 
     def execute_mount(self, root: Path) -> None:
         path = root / self.path.relative_to(root.anchor)
+
+        # TODO: workaround for unsupported async truncate in shadefs
+        path.read_bytes()
+
         with path.open("r+b") as f:
             f.truncate(self.size)
 
