@@ -54,10 +54,8 @@ operations = [Read, Write, Create, Delete, Truncate, Listdir]
 @click.option(
     "-c",
     "--cleanup",
-    type=click.Path(
-        exists=True, file_okay=False, dir_okay=True, resolve_path=True, path_type=Path
-    ),
-    help="Path to a mount directory to cleanup after running.",
+    is_flag=True,
+    help="Cleanup the mountpoint after running the exerciser.",
 )
 @click.option(
     "-m",
@@ -83,7 +81,7 @@ def exercise(
     progress: bool,
     num_operations: Optional[int],
     timeout: float,
-    cleanup: Optional[Path],
+    cleanup: bool,
     mountpoints: list[Path],
     apis: list[Api],
 ) -> None:
@@ -93,7 +91,7 @@ def exercise(
             "At least one mountpoint or API URL must be provided."
         )
 
-    if cleanup and cleanup not in mountpoints:
+    if cleanup:
         raise click.ClickException("Path to clean up must be a mountpoint.")
 
     # ensure mountpoints are empty
@@ -117,7 +115,8 @@ def exercise(
                 f"API {api_url.url} is not empty: {", ".join(str(p) for p in existing_paths)} exist.\n"
             )
 
-    with State(cleanup) as state:
+    state = State()
+    try:
         if position:
             click.echo(f"Using position file: {position}")
             exercise_position(
@@ -147,6 +146,31 @@ def exercise(
                 interactive,
                 progress,
             )
+    finally:
+        if cleanup:
+            cleanup_mountpoints(state, mountpoints)
+
+
+def cleanup_mountpoints(state, mountpoints: list[Path]) -> None:
+    """
+    Cleanup the mountpoints by removing all files and directories.
+
+    :param mountpoints: List of mountpoints to cleanup.
+    """
+    mount_path = mountpoints[0]
+
+    for path, _ in state.files():
+        (mount_path / path.relative_to("/")).unlink()
+
+    for path, _ in state.directories():
+        # don't try to remove the mountpoint
+        if path == Path("/"):
+            continue
+
+        (mount_path / path.relative_to("/")).rmdir()
+
+    # wait for the cleanup to propagate
+    time.sleep(10)  # TODO
 
 
 def exercise_position(
